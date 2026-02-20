@@ -1,0 +1,42 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import confusion_matrix, classification_report, f1_score, roc_auc_score
+import shap
+
+# 1. Dataset Handling
+df = pd.read_csv("bank.csv", sep=None, engine='python')
+df.columns = df.columns.str.replace('"', '').str.replace("'", "").str.strip()
+if 'deposit' in df.columns:
+    df = df.rename(columns={'deposit': 'y'})
+df['y'] = df['y'].map({'yes': 1, 'no': 0})
+
+# 2. Preprocessing
+categorical_cols = df.select_dtypes(include=['object']).columns
+df_final = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
+X = df_final.drop('y', axis=1)
+y = df_final['y']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+#Logistic Regression and Random Forest MODEL
+lr_model = LogisticRegression(max_iter=1000)
+lr_model.fit(X_train_scaled, y_train)
+rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+rf_model.fit(X_train, y_train)
+
+#Output 
+print("Logistic Regression F1:", f1_score(y_test, lr_model.predict(X_test_scaled)))
+print("Random Forest F1:", f1_score(y_test, rf_model.predict(X_test)))
+
+#SHAP usage
+explainer = shap.TreeExplainer(rf_model)
+shap_values = explainer.shap_values(X_test.iloc[:5])
+shap.summary_plot(explainer.shap_values(X_test.iloc[:100]), X_test.iloc[:100])
